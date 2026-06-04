@@ -29,6 +29,8 @@ BENCHMARKS = [
 
 _TODAY_PNL_TTL_SECONDS = 60
 _today_pnl_cache: tuple[float, dict[str, float]] | None = None
+_PERFORMANCE_TTL_SECONDS = 60
+_performance_cache: dict[tuple[str, str, int | None], tuple[float, dict[str, Any]]] = {}
 
 
 def usd_rate() -> float:
@@ -254,18 +256,25 @@ def today_stock_pnl(holdings: list[dict[str, Any]] | None = None) -> dict[str, f
 
 
 def performance_series(slot: str = "5d", benchmark: str = "0050.TW", account_id: int | None = None) -> dict[str, Any]:
+    cache_key = (slot, benchmark, account_id)
+    cached = _performance_cache.get(cache_key)
+    if cached and time.time() - cached[0] < _PERFORMANCE_TTL_SECONDS:
+        return cached[1]
+
     holdings = holdings_with_metrics()
     if account_id is not None:
         holdings = [row for row in holdings if int(row["account_id"]) == int(account_id)]
 
     full = slot == "all"
+    use_recent = slot in {"5d", "10d", "1m", "3m"}
+    recent_months = {"5d": 2, "10d": 2, "1m": 3, "3m": 5}.get(slot, 2)
     errors: list[dict[str, str]] = []
     value_rows: list[dict[str, Any]] = []
 
     for holding in holdings:
         symbol = _market_symbol(holding)
         try:
-            closes = fetch_daily_closes(symbol, full=full)
+            closes = fetch_recent_daily_closes(symbol, months=recent_months) if use_recent else fetch_daily_closes(symbol, full=full)
         except MarketDataError as exc:
             errors.append({"symbol": holding["symbol"], "error": str(exc)})
             continue
@@ -296,7 +305,11 @@ def performance_series(slot: str = "5d", benchmark: str = "0050.TW", account_id:
     try:
         benchmark_rows = [
             {"date": day, "benchmark_value": close}
-            for day, close in fetch_daily_closes(benchmark_meta["symbol"], full=full).items()
+            for day, close in (
+                fetch_recent_daily_closes(benchmark_meta["symbol"], months=recent_months)
+                if use_recent
+                else fetch_daily_closes(benchmark_meta["symbol"], full=full)
+            ).items()
         ]
         benchmark_rows = _slice_by_slot(benchmark_rows, slot)
         benchmark_returns = _returns_from_values(benchmark_rows, "benchmark_value", "benchmark_return")
@@ -317,13 +330,15 @@ def performance_series(slot: str = "5d", benchmark: str = "0050.TW", account_id:
         if "portfolio_return" in row or "benchmark_return" in row
     ]
 
-    return {
+    result = {
         "slot": slot,
         "benchmark": benchmark_meta,
         "account_id": account_id,
         "series": series,
         "errors": errors,
     }
+    _performance_cache[cache_key] = (time.time(), result)
+    return result
 
 
 def export_csv_bytes(rows: list[dict[str, Any]]) -> bytes:

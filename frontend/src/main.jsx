@@ -384,12 +384,12 @@ function Overview({ data, accounts, benchmarks, paletteMode, todayPnl }) {
   const todayPnlPct = todayPnl?.today_return_pct ?? data.metrics.today_return_pct;
   return (
     <Stack spacing={2.5}>
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} lg={2.4}><MetricCard label="總資產（折台幣）" value={fmtTwd(data.metrics.total_twd)} /></Grid>
-        <Grid item xs={12} sm={6} lg={2.4}><MetricCard label="今日損益" value={todayPnlValue == null ? "載入中" : fmtTwd(todayPnlValue)} sub={fmtPct(todayPnlPct)} tone={(todayPnlValue ?? 0) >= 0 ? "error" : "success"} /></Grid>
-        <Grid item xs={12} sm={6} lg={2.4}><MetricCard label="現金部位" value={fmtTwd(data.metrics.cash_twd)} tone="secondary" /></Grid>
-        <Grid item xs={12} sm={6} lg={2.4}><MetricCard label="股票市值" value={fmtTwd(data.metrics.stock_value_twd)} tone="secondary" /></Grid>
-        <Grid item xs={12} sm={6} lg={2.4}><MetricCard label="累積股票損益" value={fmtTwd(data.metrics.stock_pnl_twd)} sub={`${fmtNum(data.metrics.stock_return_pct)}%`} tone={data.metrics.stock_pnl_twd >= 0 ? "error" : "success"} /></Grid>
+      <Grid container spacing={2} justifyContent="center">
+        <Grid item xs={12} sm={6} md={4} lg={2.4}><MetricCard label="總資產（折台幣）" value={fmtTwd(data.metrics.total_twd)} /></Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}><MetricCard label="現金部位" value={fmtTwd(data.metrics.cash_twd)} tone="secondary" /></Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}><MetricCard label="股票市值" value={fmtTwd(data.metrics.stock_value_twd)} tone="secondary" /></Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}><MetricCard label="今日損益" value={todayPnlValue == null ? "載入中" : fmtTwd(todayPnlValue)} sub={fmtPct(todayPnlPct)} tone={(todayPnlValue ?? 0) >= 0 ? "error" : "success"} /></Grid>
+        <Grid item xs={12} sm={6} md={4} lg={2.4}><MetricCard label="累積損益" value={fmtTwd(data.metrics.stock_pnl_twd)} sub={`${fmtNum(data.metrics.stock_return_pct)}%`} tone={data.metrics.stock_pnl_twd >= 0 ? "error" : "success"} /></Grid>
       </Grid>
       <Grid container spacing={2}>
         <Grid item xs={12} md={4}>
@@ -421,17 +421,6 @@ function Overview({ data, accounts, benchmarks, paletteMode, todayPnl }) {
           <PerformanceChart accounts={accounts} benchmarks={benchmarks} paletteMode={paletteMode} />
         </Grid>
       </Grid>
-      <Section title="帳戶餘額">
-        <DataTable
-          rows={data.accounts}
-          columns={[
-            { key: "name", label: "帳戶" },
-            { key: "type", label: "類型" },
-            { key: "balance", label: "餘額", align: "right", render: (r) => fmtMoney(r.balance, r.currency) },
-            { key: "twd_value", label: "折台幣", align: "right", render: (r) => fmtTwd(r.twd_value) }
-          ]}
-        />
-      </Section>
     </Stack>
   );
 }
@@ -751,11 +740,31 @@ function App() {
             })}
           </List>
           <Box sx={{ mt: "auto", p: 2.5 }}>
-            <Paper variant="outlined" sx={{ p: 1.75, bgcolor: (theme) => theme.custom.paperSoft }}>
+            <Stack spacing={1.25}>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: (theme) => theme.custom.paperSoft }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, mb: 1 }}>帳戶餘額</Typography>
+                <Stack spacing={1}>
+                  {(data?.overview?.accounts || []).slice(0, 4).map((account) => (
+                    <Box key={account.id}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {account.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                        {fmtMoney(account.balance, account.currency)}
+                      </Typography>
+                    </Box>
+                  ))}
+                  {data?.overview?.accounts?.length > 4 && (
+                    <Typography variant="caption" color="text.secondary">另 {data.overview.accounts.length - 4} 個帳戶</Typography>
+                  )}
+                </Stack>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 1.75, bgcolor: (theme) => theme.custom.paperSoft }}>
               <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>USD/TWD</Typography>
               <Typography variant="h6" color="primary" sx={{ mt: 0.25, fontVariantNumeric: "tabular-nums" }}>{data?.overview?.rate?.toFixed(4) || "-"}</Typography>
               <Typography variant="caption" color="text.secondary">{data?.overview?.rate_updated || "未設定"}</Typography>
-            </Paper>
+              </Paper>
+            </Stack>
           </Box>
         </Drawer>
         <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>

@@ -1,19 +1,41 @@
-# 個人資產追蹤工具
+# Finance Tracker
 
-本專案已改為 React + MUI 前端、FastAPI 後端、SQLite 本機資料庫。資料仍存在同目錄的 `finance.db`，表格彙總與 CSV 匯出使用 Polars，不再使用 pandas。
+A local-first portfolio tracker built with a React + MUI frontend, a FastAPI backend, SQLite persistence, and Polars for tabular summaries and CSV exports.
 
-## 安裝
+All personal financial data is stored locally in `finance.db`.
+
+## Setup
 
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 npm install
 ```
 
-## 設定即時行情 API
+## Run
 
-專案根目錄已建立 `.env`：
+Start the API and web app together:
+
+```bash
+npm run dev
+```
+
+Or run them separately:
+
+```bash
+npm run dev:api
+npm run dev:web
+```
+
+Local URLs:
+
+- Web app: `http://127.0.0.1:5173`
+- API: `http://127.0.0.1:8000`
+
+## Market Data
+
+The project uses `.env` for market data configuration:
 
 ```env
 MARKET_DATA_API_PROVIDER=alphavantage
@@ -23,65 +45,90 @@ MARKET_DATA_HISTORY_API_URL=
 USD_TWD_API_SYMBOL=USDTWD
 ```
 
-台股行情使用 [`twstock`](https://github.com/mlouielu/twstock)：
+Taiwan stock data is fetched with [`twstock`](https://github.com/mlouielu/twstock):
 
-- 即時價：`twstock.realtime.get`
-- 歷史日線：`twstock.Stock(...).fetch_from`
-- 依賴：`twstock`、`lxml`
+- Realtime quotes: `twstock.realtime.get`
+- Daily history: `twstock.Stock(...).fetch_from`
+- Required packages: `twstock`, `lxml`
 
-美股與其他基準指數預設支援 Alpha Vantage：
+US stocks and non-Taiwan benchmarks use the configured market data provider. The default adapter supports Alpha Vantage:
 
-- 股票報價：`GLOBAL_QUOTE`
-- USD/TWD 匯率：`CURRENCY_EXCHANGE_RATE`
+- Quotes: `GLOBAL_QUOTE`
+- Daily history: `TIME_SERIES_DAILY`
+- USD/TWD: `CURRENCY_EXCHANGE_RATE`
 
-如果你使用其他行情服務，可以填 `MARKET_DATA_API_URL`，後端會替換 `{symbol}` 與 `{api_key}`，並從 JSON 回應中讀取第一個可用的即時價格欄位。
+For another provider, set:
 
-持倉報酬率折線圖需要日線歷史資料。台股會透過 `twstock` 抓 TWSE/TPEX；美股與其他基準預設 Alpha Vantage 使用 `TIME_SERIES_DAILY`。若使用其他服務，可填 `MARKET_DATA_HISTORY_API_URL`，同樣支援 `{symbol}` 與 `{api_key}` 佔位。
+- `MARKET_DATA_API_URL` for realtime quotes
+- `MARKET_DATA_HISTORY_API_URL` for daily history
 
-## 啟動
+Both custom URLs can use `{symbol}` and `{api_key}` placeholders.
 
-同時啟動 API 與 React：
-
-```bash
-npm run dev
-```
-
-分開啟動：
-
-```bash
-npm run dev:api
-npm run dev:web
-```
-
-開啟：
-
-- 前端：`http://127.0.0.1:5173`
-- API：`http://127.0.0.1:8000`
-
-## 架構
+## Architecture
 
 ```text
 finance-tracker/
-├── app.py                  # FastAPI entry point
+├── app.py                    # FastAPI entry point
 ├── backend/
-│   ├── main.py             # API routes
-│   ├── finance.py          # Polars summaries, fee and P/L calculations
-│   └── market_data.py      # .env-driven market data adapter
-├── database.py             # SQLite persistence layer
-├── frontend/src/main.jsx   # React + MUI app
+│   ├── main.py               # API routes
+│   ├── finance.py            # portfolio metrics, P/L, Polars summaries
+│   └── market_data.py        # twstock + env-driven market data adapters
+├── database.py               # SQLite persistence layer
+├── frontend/src/main.jsx     # React + MUI frontend
+├── scripts/
+│   └── import_fubon_pdfs.py  # Fubon statement PDF importer
 ├── package.json
 ├── requirements.txt
 ├── .env
 └── .env.example
 ```
 
-## 功能
+## Features
 
-| 頁面 | 功能 |
-|------|------|
-| 總覽 | 資產 KPI、配置圖、持倉報酬折線圖、帳戶餘額 |
-| 帳戶管理 | 新增帳戶、調整餘額、轉帳 / 存提 |
-| 持股管理 | 查看持倉、手動更新現價、自動抓取行情、新增股票 |
-| 股票買賣 | 記錄買賣、估算手續費、刪除交易並重算持倉 |
-| 資金異動 | 查看與刪除資金異動 |
-| 設定 | 更新匯率、抓取 USD/TWD、調整手續費、匯出 CSV |
+| Page | Features |
+| --- | --- |
+| Overview | KPI cards, allocation chart, portfolio performance line chart, sidebar account balances |
+| Accounts | Add accounts, adjust balances, record deposits, withdrawals, and transfers |
+| Holdings | View holdings, update prices manually or from market data, add stocks |
+| Trades | Record buy/sell transactions, estimate fees, delete transactions and recalculate holdings |
+| Transactions | View and delete account cash movements |
+| Settings | Update USD/TWD, refresh exchange rate, configure fees, export CSV backups |
+
+## Performance Chart
+
+The overview performance chart supports:
+
+- Time ranges: `5D`, `10D`, `1M`, `3M`, `1Y`, `ALL`
+- Default range: `5D`
+- Default benchmark: Taiwan 50 (`0050.TW`)
+- Account filter: all accounts or a single account
+- Tooltip values for portfolio return, benchmark return, and portfolio value
+
+Short ranges use a recent-history fast path and in-memory caching to avoid repeated slow market-data calls.
+
+## Import Fubon PDF Statements
+
+Put encrypted Fubon securities monthly statement PDFs in `pdf/`, then run:
+
+```bash
+FUBON_PDF_PASSWORD='your-password' python scripts/import_fubon_pdfs.py
+```
+
+The importer:
+
+- Backs up `finance.db` first
+- Clears the current database
+- Imports detected stock trades
+- Rebuilds stock master records and holdings
+- Imports margin table rows as normal trades with notes preserving the original type
+
+The current data model does not separately model margin debt. If a statement does not include cash ledger rows, the cash account balance is reconstructed from trade cash flows only.
+
+## Data And Privacy
+
+- `finance.db` is local and ignored by Git.
+- `finance.db.backup.*` is ignored by Git.
+- `pdf/` is ignored by Git.
+- `.env` is ignored by Git.
+
+Do not commit statement PDFs, database backups, or API keys.
