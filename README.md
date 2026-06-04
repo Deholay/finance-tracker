@@ -1,90 +1,87 @@
-# 💰 個人資產追蹤工具
+# 個人資產追蹤工具
 
-完全本機運行的資產管理工具，資料存在同目錄的 `finance.db`，不會上傳任何資訊。
+本專案已改為 React + MUI 前端、FastAPI 後端、SQLite 本機資料庫。資料仍存在同目錄的 `finance.db`，表格彙總與 CSV 匯出使用 Polars，不再使用 pandas。
 
----
+## 安裝
 
-## 🚀 安裝與啟動
-
-### 首次安裝（只需執行一次）
-
-#### 1. 建立虛擬環境
 ```bash
-cd finance_tracker
 python -m venv venv
-source venv/bin/activate        # Mac/Linux
-# 或 venv\Scripts\activate      # Windows
-```
-
-#### 2. 安裝套件
-```bash
+source venv/bin/activate
 pip install -r requirements.txt
+npm install
 ```
 
----
+## 設定即時行情 API
 
-### 之後每次啟動
+專案根目錄已建立 `.env`：
+
+```env
+MARKET_DATA_API_PROVIDER=alphavantage
+MARKET_DATA_API_KEY=
+MARKET_DATA_API_URL=
+MARKET_DATA_HISTORY_API_URL=
+USD_TWD_API_SYMBOL=USDTWD
+```
+
+台股行情使用 [`twstock`](https://github.com/mlouielu/twstock)：
+
+- 即時價：`twstock.realtime.get`
+- 歷史日線：`twstock.Stock(...).fetch_from`
+- 依賴：`twstock`、`lxml`
+
+美股與其他基準指數預設支援 Alpha Vantage：
+
+- 股票報價：`GLOBAL_QUOTE`
+- USD/TWD 匯率：`CURRENCY_EXCHANGE_RATE`
+
+如果你使用其他行情服務，可以填 `MARKET_DATA_API_URL`，後端會替換 `{symbol}` 與 `{api_key}`，並從 JSON 回應中讀取第一個可用的即時價格欄位。
+
+持倉報酬率折線圖需要日線歷史資料。台股會透過 `twstock` 抓 TWSE/TPEX；美股與其他基準預設 Alpha Vantage 使用 `TIME_SERIES_DAILY`。若使用其他服務，可填 `MARKET_DATA_HISTORY_API_URL`，同樣支援 `{symbol}` 與 `{api_key}` 佔位。
+
+## 啟動
+
+同時啟動 API 與 React：
 
 ```bash
-cd finance_tracker
-source venv/bin/activate        # Mac/Linux
-# 或 venv\Scripts\activate      # Windows
-streamlit run app.py
+npm run dev
 ```
 
-瀏覽器會自動開啟 `http://localhost:8501`
+分開啟動：
 
----
-
-## 📁 檔案結構
+```bash
+npm run dev:api
+npm run dev:web
 ```
-finance_tracker/
-├── app.py          # 主程式（Streamlit UI）
-├── database.py     # 資料庫操作（SQLite）
-├── finance.db      # 資料庫（首次啟動自動建立）
+
+開啟：
+
+- 前端：`http://127.0.0.1:5173`
+- API：`http://127.0.0.1:8000`
+
+## 架構
+
+```text
+finance-tracker/
+├── app.py                  # FastAPI entry point
+├── backend/
+│   ├── main.py             # API routes
+│   ├── finance.py          # Polars summaries, fee and P/L calculations
+│   └── market_data.py      # .env-driven market data adapter
+├── database.py             # SQLite persistence layer
+├── frontend/src/main.jsx   # React + MUI app
+├── package.json
 ├── requirements.txt
-└── README.md
+├── .env
+└── .env.example
 ```
 
----
-
-## 🗂️ 功能說明
+## 功能
 
 | 頁面 | 功能 |
 |------|------|
-| 📊 總覽 | 資產加總、配置圓餅圖、帳戶餘額、各股損益橫條圖 |
-| 🏦 帳戶管理 | 新增帳戶、調整餘額、記錄轉帳 / 存提，支援多幣別與換匯成本 |
-| 📈 持股管理 | 查看持倉損益、手動或自動更新股價、新增股票 |
-| 🔄 股票買賣 | 記錄買賣，自動扣款 / 回補帳戶餘額，重算均價與損益 |
-| 💸 資金異動 | 查看所有帳戶資金異動歷史 |
-| ⚙️ 設定 | 更新 USD/TWD 匯率（手動或自動抓取）、調整手續費設定、匯出 CSV 備份 |
-
----
-
-## 💾 備份
-
-- **完整備份**：直接複製 `finance.db` 即可
-- **CSV 匯出**：至「設定」頁面，可個別匯出帳戶、持倉、股票主檔、股票交易記錄（UTF-8 with BOM，支援 Excel 直接開啟）
-
----
-
-## ⚙️ 手續費設定
-
-在設定頁面可自訂：
-
-| 項目 | 預設值 |
-|------|--------|
-| 台股整張手續費率 | 0.1425%，最低 NT$20 |
-| 台股零股手續費率 | 0.0855%，最低 NT$1 |
-| 台股股票證交稅 | 0.3% |
-| 台股 ETF 證交稅 | 0.1% |
-| 美股手續費率 | 0.1%，最低 $1 USD |
-
----
-
-## 💡 技術說明
-
-- **前端**：Streamlit
-- **資料庫**：SQLite（`finance.db`）
-- **股價抓取**：yfinance（Yahoo Finance）
-- **外幣換匯成本**：每個帳戶可鎖定換匯時的台幣成本（`twd_cost`），不隨即時匯率浮動；買賣股票自動按比例調整
+| 總覽 | 資產 KPI、配置圖、持倉報酬折線圖、帳戶餘額 |
+| 帳戶管理 | 新增帳戶、調整餘額、轉帳 / 存提 |
+| 持股管理 | 查看持倉、手動更新現價、自動抓取行情、新增股票 |
+| 股票買賣 | 記錄買賣、估算手續費、刪除交易並重算持倉 |
+| 資金異動 | 查看與刪除資金異動 |
+| 設定 | 更新匯率、抓取 USD/TWD、調整手續費、匯出 CSV |

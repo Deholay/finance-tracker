@@ -1,23 +1,9 @@
-# 資料庫（含個人資料，不 commit）
-finance.db
-
-# Python 虛擬環境
 venv/
-.venv/
-env/
-
-# Python cache
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# macOS
+finance.db
+finance.db.backup.*
+pdf/
+node_modules/
+dist/
 .DS_Store
-
-# IDE
-.vscode/
-.idea/
-
-# 環境變數
-.env
